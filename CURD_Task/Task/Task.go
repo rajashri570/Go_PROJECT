@@ -2,6 +2,7 @@ package Task
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -26,12 +27,13 @@ type Task struct {
 		Deadline time.Time `json:"deadline"`
 		isvalid  bool      `json: "isvalid"`*/
 	//gorm.Model
-	Username string    `json:"username" gorm:"column:username"`
-	Taskname string    `json:"taskname" gorm:"column:taskname"`
-	Status   int       `json:"status"`
-	Priority int       `json:"priority"`
-	Deadline time.Time `json:"deadline"`
-	Isvalid  bool      `json:"isvalid" gorm:"column:isvalid"`
+
+	Username string     `json:"username" gorm:"column:username"`
+	Taskname string     `json:"taskname" gorm:"column:taskname"`
+	Status   int        `json:"status"`
+	Priority int        `json:"priority"`
+	Deadline *time.Time `json:"deadline"` // Use a pointer to time.Time to allow NULL
+	Isvalid  bool       `json:"isvalid" gorm:"column:isvalid"`
 }
 
 func InitialMigration() {
@@ -66,16 +68,44 @@ func View_tasks(w http.ResponseWriter, r *http.Request) {
 		return
 
 	}
+	fmt.Print("data showing")
 	json.NewEncoder(w).Encode(task_tbl)
 }
 
+/*
 func Create_task(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var task_tbl Task
 	json.NewDecoder(r.Body).Decode(&task_tbl)
 	DB.Create(&task_tbl)
 	json.NewEncoder(w).Encode(task_tbl)
+	fmt.Print("data inserted...")
 
+}*/
+func Create_task(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var task_tbl Task
+	if err := json.NewDecoder(r.Body).Decode(&task_tbl); err != nil {
+		log.Println("Error decoding JSON:", err)
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	// Log the received task data
+	log.Printf("Received Task: %+v\n", task_tbl)
+
+	// Attempt to create the task
+	if err := DB.Create(&task_tbl).Error; err != nil {
+		log.Println("Error creating task:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Log a success message
+	log.Println("Task created successfully")
+
+	// Respond with the created task
+	json.NewEncoder(w).Encode(task_tbl)
 }
 
 func Get_task(w http.ResponseWriter, r *http.Request) {
