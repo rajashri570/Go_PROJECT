@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -115,3 +116,57 @@ func Get_task(w http.ResponseWriter, r *http.Request) {
 	DB.First(&task_tbl, params["id"])
 	json.NewEncoder(w).Encode(task_tbl)
 }
+
+func Update_task(w http.ResponseWriter, r *http.Request) {
+	// Parse the task ID from the request parameters
+	vars := mux.Vars(r)
+	taskID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, "Invalid task ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse the JSON request body
+	var updateData map[string]int
+	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
+		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	// Extract the new status value from the JSON data
+	newStatus, ok := updateData["status"]
+	if !ok {
+		http.Error(w, "Status field is required", http.StatusBadRequest)
+		return
+	}
+
+	// Update the task status in the database
+	result := DB.Model(&Task{}).Where("id = ?", taskID).Update("status", newStatus)
+	if result.Error != nil {
+		http.Error(w, "Failed to update task status", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if the task was found and updated
+	if result.RowsAffected == 0 {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	// Respond with success
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Task status updated successfully")
+}
+
+/* json values like
+
+{
+    "id": 3,
+    "username": "shiva",
+    "taskname": "create v2 project",
+    "status": 0,
+    "priority": 1,
+    "deadline": "2023-12-19T23:59:59Z",
+    "isvalid": true
+}
+*/
